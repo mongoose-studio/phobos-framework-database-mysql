@@ -69,6 +69,13 @@ class MySQLDriver extends AbstractDriver {
             $pdo->exec("SET time_zone = '{$config['timezone']}'");
         }
 
+        // PDO atributos adicionales
+        if (isset($config['options']) && is_array($config['options'])) {
+            foreach ($config['options'] as $key => $value) {
+                $pdo->setAttribute($key, $value);
+            }
+        }
+
         // Session variables adicionales
         if (isset($config['session_variables']) && is_array($config['session_variables'])) {
             foreach ($config['session_variables'] as $key => $value) {
