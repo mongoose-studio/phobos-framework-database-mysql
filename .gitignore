@@ -9,5 +9,9 @@ composer.lock
 out
 gen
 
+# Testing
+coverage/
+.phpunit.result.cache
+
 # others
 utils.md
