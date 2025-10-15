@@ -1,0 +1,215 @@
+# PhobosFramework MySQL Driver
+
+This is the **PhobosFramework MySQL Driver** - a database driver implementation for the PhobosFramework Database Layer that provides MySQL and MariaDB connectivity. This is a **library package** meant to be used via Composer alongside `mongoose-studio/phobos-framework-database`.
+
+The driver extends `AbstractDriver` from the database layer and implements MySQL-specific functionality including:
+- DSN generation with support for TCP and Unix socket connections
+- MySQL-specific PDO configuration (charset, collation, strict mode)
+- Connection initialization with timezone and session variables
+- Database-specific operations (OPTIMIZE TABLE, ANALYZE TABLE)
+- Transaction isolation level configuration
+- MariaDB detection and version querying
+
+## Architecture
+
+### Driver Implementation
+
+**MySQLDriver** (`src/Drivers/MySQL/MySQLDriver.php`)
+
+This is the only class in this package. It implements `DriverInterface` from the database layer and provides:
+
+1. **Connection Configuration**:
+   - `getDSN(array $config)`: Builds MySQL DSN string from configuration
+   - `getPDOOptions(array $config)`: Returns MySQL-specific PDO options
+   - `configure(PDO $pdo, array $config)`: Post-connection configuration
+
+2. **Driver Identification**:
+   - `getName()`: Returns 'mysql'
+   - `supportsSavepoints()`: Returns true (MySQL supports nested transactions)
+
+3. **SQL Generation**:
+   - `quoteIdentifier(string $identifier)`: Wraps identifiers in backticks
+   - `getSetIsolationLevelSQL(string $level)`: Generates SET SESSION TRANSACTION ISOLATION LEVEL SQL
+
+4. **Database Operations**:
+   - `getServerVersion(PDO $pdo)`: Retrieves MySQL/MariaDB version
+   - `isMariaDB(PDO $pdo)`: Detects if server is MariaDB
+   - `optimizeTable(PDO $pdo, string $table)`: Runs OPTIMIZE TABLE
+   - `analyzeTable(PDO $pdo, string $table)`: Runs ANALYZE TABLE
+
+### Configuration Structure
+
+The driver expects this configuration format (typically in `config/database.php`):
+
+```php
+[
+    'driver' => 'mysql',
+    'host' => 'localhost',
+    'port' => 3306,                    // Optional, defaults to 3306
+    'database' => 'mydb',
+    'username' => 'user',
+    'password' => 'pass',
+    'charset' => 'utf8mb4',            // Optional, defaults to utf8mb4
+    'collation' => 'utf8mb4_unicode_ci', // Optional
+    'strict' => true,                  // Optional, defaults to true (enables strict mode)
+    'timezone' => '+00:00',            // Optional, sets session timezone
+    'unix_socket' => '/path/to/socket', // Optional, use Unix socket instead of TCP
+    'options' => [                     // Optional, additional PDO attributes
+        PDO::ATTR_TIMEOUT => 5,
+    ],
+    'session_variables' => [           // Optional, MySQL session variables
+        'sql_mode' => 'TRADITIONAL',
+        'wait_timeout' => 28800,
+    ],
+]
+```
+
+### Integration with Database Layer
+
+This driver is registered in the database layer's configuration:
+
+```php
+// config/database.php
+[
+    'drivers' => [
+        'mysql' => \PhobosFramework\Database\Drivers\MySQL\MySQLDriver::class,
+    ],
+    'connections' => [
+        'mysql' => [
+            'driver' => 'mysql',
+            // ... configuration as shown above
+        ],
+    ],
+]
+```
+
+## Common Development Commands
+
+### Composer Operations
+
+```bash
+# Install dependencies
+composer install
+
+# Update dependencies
+composer update
+
+# Validate composer.json
+composer validate
+
+# Dump autoloader (after adding new classes)
+composer dump-autoload
+```
+
+### Code Quality
+
+```bash
+# PHP syntax check
+php -l src/Drivers/MySQL/MySQLDriver.php
+
+# Check PSR-4 autoloading
+composer dump-autoload --optimize
+```
+
+## Important Implementation Details
+
+### Charset and Collation Handling
+
+The driver sets charset and collation via `MYSQL_ATTR_INIT_COMMAND` PDO attribute. If collation is provided, it generates:
+```sql
+SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'
+```
+
+### Strict Mode
+
+By default (`strict: true`), the driver enables strict SQL mode for production safety:
+```sql
+SET sql_mode='STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'
+```
+
+This prevents:
+- Invalid data insertions (silently truncated to fit column)
+- Zero dates (0000-00-00)
+- Division by zero returning NULL instead of error
+
+### Unix Socket Support
+
+For local connections, you can use Unix sockets instead of TCP for better performance:
+```php
+[
+    'unix_socket' => '/var/run/mysqld/mysqld.sock',
+    'database' => 'mydb',
+]
+```
+
+When `unix_socket` is provided, the DSN ignores `host` and `port`.
+
+### Identifier Quoting
+
+MySQL uses backticks for identifiers. The driver properly escapes backticks within identifiers:
+```php
+`table_name`
+`column``with``backticks`  // column`with`backticks
+```
+
+### Transaction Isolation Levels
+
+MySQL requires `SET SESSION TRANSACTION ISOLATION LEVEL` before starting the transaction, not within it. The driver generates the correct SQL format.
+
+Supported levels:
+- `READ UNCOMMITTED`
+- `READ COMMITTED`
+- `REPEATABLE READ` (MySQL default)
+- `SERIALIZABLE`
+
+## Namespace Convention
+
+All code uses the namespace: `PhobosFramework\Database\Drivers\MySQL\`
+
+## Dependencies
+
+- PHP 8.3+ (uses typed properties, return types)
+- `ext-pdo`: Required for PDO connections
+- `mongoose-studio/phobos-framework`: ^3.0 (parent framework)
+- `mongoose-studio/phobos-framework-database`: ^3.0 (database layer providing AbstractDriver)
+
+## Related Packages
+
+This driver is part of the Phobos Framework ecosystem:
+
+- **phobos-framework**: Core framework with DI container, routing, HTTP layer
+- **phobos-framework-database**: Abstract database layer with query builder, entities, connection management
+- **phobos-framework-database-mysql**: This package - MySQL/MariaDB driver implementation
+
+## Code Style Notes
+
+- Follow PSR-4 autoloading
+- Use type hints for all parameters and return types
+- Document public methods with PHPDoc comments
+- Spanish comments are acceptable (matches parent framework conventions)
+- Code header includes MIT license notice and author attribution
+
+## MySQL vs MariaDB Detection
+
+The driver provides `isMariaDB()` method to detect MariaDB servers by checking if version string contains "mariadb". This can be useful for:
+- Feature detection (MariaDB-specific features)
+- Query optimization (different engines)
+- Logging/monitoring (tracking database type)
+
+## Database Maintenance Operations
+
+The driver provides utility methods for database maintenance:
+
+### OPTIMIZE TABLE
+```php
+$driver->optimizeTable($pdo, 'users');
+```
+Defragments tables, reclaims unused space, updates index statistics. Useful for tables with frequent DELETE/UPDATE operations.
+
+### ANALYZE TABLE
+```php
+$driver->analyzeTable($pdo, 'products');
+```
+Updates table statistics for query optimizer. Run after significant data changes to improve query performance.
+
+Both methods respect the driver's `quoteIdentifier()` to prevent SQL injection.
