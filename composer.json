@@ -1,14 +1,15 @@
 {
     "name": "mongoose-studio/phobos-framework-database-mysql",
     "description": "Phobos Framework Mysql Connector for Database Layer",
-    "version": "3.0.1",
+    "version": "3.2.0",
     "type": "library",
     "license": "MIT",
     "require": {
-        "php": ">=8.3",
+        "php": ">=8.4",
         "ext-pdo": "*",
-        "mongoose-studio/phobos-framework": "^3.0",
-        "mongoose-studio/phobos-framework-database": "^3.0"
+        "ext-pdo_mysql": "*",
+        "mongoose-studio/phobos-framework": "^3.1",
+        "mongoose-studio/phobos-framework-database": "^3.2"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.5",

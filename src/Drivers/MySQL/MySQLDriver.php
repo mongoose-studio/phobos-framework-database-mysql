@@ -16,6 +16,7 @@ use PDO;
 use PDOException;
 use PhobosFramework\Database\Drivers\AbstractDriver;
 use PhobosFramework\Database\Exceptions\ConfigurationException;
+use PhobosFramework\Database\QueryBuilder\Grammar\Grammar;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -189,6 +190,15 @@ class MySQLDriver extends AbstractDriver {
 
     /**
      * {@inheritdoc}
+     *
+     * MySQL/MariaDB cita identificadores con backticks.
+     */
+    public function getGrammar(): Grammar {
+        return $this->grammar ??= new MySQLGrammar();
+    }
+
+    /**
+     * {@inheritdoc}
      */
     public function getSetIsolationLevelSQL(string $level): string {
         // Validar que el nivel de aislamiento sea válido
@@ -244,15 +254,7 @@ class MySQLDriver extends AbstractDriver {
      * @return bool Verdadero si la operación fue exitosa
      */
     public function optimizeTable(PDO $pdo, string $table): bool {
-        $quotedTable = $this->quoteIdentifier($table);
-
-        try {
-            $pdo->exec("OPTIMIZE TABLE $quotedTable");
-            return true;
-        } catch (PDOException) {
-            // Log error or rethrow depending on requirements
-            return false;
-        }
+        return $this->runMaintenanceStatement($pdo, 'OPTIMIZE TABLE', $table);
     }
 
     /**
@@ -263,13 +265,43 @@ class MySQLDriver extends AbstractDriver {
      * @return bool Verdadero si la operación fue exitosa
      */
     public function analyzeTable(PDO $pdo, string $table): bool {
+        return $this->runMaintenanceStatement($pdo, 'ANALYZE TABLE', $table);
+    }
+
+    /**
+     * Ejecuta una sentencia de mantenimiento (OPTIMIZE/ANALYZE/CHECK/REPAIR TABLE)
+     * y determina si fue exitosa.
+     *
+     * MySQL no lanza una excepción cuando la tabla no existe: devuelve un conjunto
+     * de resultados con una fila cuyo `Msg_type` es `Error`. Por eso hay que ejecutar
+     * la sentencia como consulta, leer las filas de estado y detectar cualquier fila
+     * de error, en lugar de asumir éxito porque `exec()` no arrojó.
+     *
+     * @param PDO $pdo Instancia de conexión PDO
+     * @param string $statement Sentencia de mantenimiento (ej: 'OPTIMIZE TABLE')
+     * @param string $table Nombre de la tabla objetivo
+     * @return bool Verdadero si ninguna fila reportó un error
+     */
+    private function runMaintenanceStatement(PDO $pdo, string $statement, string $table): bool {
         $quotedTable = $this->quoteIdentifier($table);
 
         try {
-            $pdo->exec("ANALYZE TABLE $quotedTable");
+            $stmt = $pdo->query("$statement $quotedTable");
+
+            if ($stmt === false) {
+                return false;
+            }
+
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($rows as $row) {
+                if (isset($row['Msg_type']) && strcasecmp((string)$row['Msg_type'], 'error') === 0) {
+                    return false;
+                }
+            }
+
             return true;
         } catch (PDOException) {
-            // Log error or rethrow depending on requirements
             return false;
         }
     }

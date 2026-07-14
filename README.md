@@ -1,6 +1,6 @@
 # Phobos Framework - MySQL Driver
 
-[![PHP Version](https://img.shields.io/badge/PHP-%3E%3D%208.3-blue)](https://www.php.net/)
+[![PHP Version](https://img.shields.io/badge/PHP-%3E%3D%208.4-blue)](https://www.php.net/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt)
 [![Phobos Framework](https://img.shields.io/badge/Phobos-Framework-orange)](https://github.com/mongoose-studio/phobos-framework)
 
@@ -33,8 +33,8 @@ composer require mongoose-studio/phobos-framework-database-mysql
 ### Dependencias
 
 Este driver requiere:
-- `mongoose-studio/phobos-framework` ^3.0
-- `mongoose-studio/phobos-framework-database` ^3.0
+- `mongoose-studio/phobos-framework` ^3.1
+- `mongoose-studio/phobos-framework-database` ^3.2
 - Extensión `ext-pdo` habilitada
 - Extensión `ext-pdo_mysql` habilitada
 

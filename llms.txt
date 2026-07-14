@@ -168,10 +168,10 @@ All code uses the namespace: `PhobosFramework\Database\Drivers\MySQL\`
 
 ## Dependencies
 
-- PHP 8.3+ (uses typed properties, return types)
+- PHP 8.4+ (uses typed properties, return types)
 - `ext-pdo`: Required for PDO connections
-- `mongoose-studio/phobos-framework`: ^3.0 (parent framework)
-- `mongoose-studio/phobos-framework-database`: ^3.0 (database layer providing AbstractDriver)
+- `mongoose-studio/phobos-framework`: ^3.1 (parent framework)
+- `mongoose-studio/phobos-framework-database`: ^3.2 (database layer providing AbstractDriver)
 
 ## Related Packages
 

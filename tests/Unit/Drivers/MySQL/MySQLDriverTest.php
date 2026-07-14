@@ -512,11 +512,15 @@ class MySQLDriverTest extends TestCase {
     // ========== Tests de optimizeTable() ==========
 
     public function test_optimize_table_executes_optimize_command(): void {
+        $stmt = $this->statusRowsStatement([
+            ['Table' => 'db.users', 'Op' => 'optimize', 'Msg_type' => 'status', 'Msg_text' => 'OK'],
+        ]);
+
         $this->pdo
-            ->shouldReceive('exec')
+            ->shouldReceive('query')
             ->once()
             ->with('OPTIMIZE TABLE `users`')
-            ->andReturn(1);
+            ->andReturn($stmt);
 
         $result = $this->driver->optimizeTable($this->pdo, 'users');
 
@@ -524,23 +528,49 @@ class MySQLDriverTest extends TestCase {
     }
 
     public function test_optimize_table_quotes_table_name(): void {
+        $stmt = $this->statusRowsStatement([
+            ['Msg_type' => 'status', 'Msg_text' => 'OK'],
+        ]);
+
         $this->pdo
-            ->shouldReceive('exec')
+            ->shouldReceive('query')
             ->once()
             ->with('OPTIMIZE TABLE `table``with``backticks`')
-            ->andReturn(1);
+            ->andReturn($stmt);
 
         $result = $this->driver->optimizeTable($this->pdo, 'table`with`backticks');
 
         $this->assertTrue($result);
     }
 
-    public function test_optimize_table_returns_false_on_exception(): void {
+    /**
+     * Regresión: MySQL no lanza excepción cuando la tabla no existe, devuelve una fila
+     * con Msg_type = Error. El driver usaba exec() (que descarta esas filas) y siempre
+     * reportaba true. Ahora debe leer la fila de estado y devolver false.
+     */
+    public function test_optimize_table_returns_false_when_status_row_reports_error(): void {
+        $stmt = $this->statusRowsStatement([
+            ['Msg_type' => 'Error', 'Msg_text' => "Table 'db.users' doesn't exist"],
+            ['Msg_type' => 'status', 'Msg_text' => 'Operation failed'],
+        ]);
+
         $this->pdo
-            ->shouldReceive('exec')
+            ->shouldReceive('query')
             ->once()
             ->with('OPTIMIZE TABLE `users`')
-            ->andThrow(new PDOException('Table does not exist'));
+            ->andReturn($stmt);
+
+        $result = $this->driver->optimizeTable($this->pdo, 'users');
+
+        $this->assertFalse($result);
+    }
+
+    public function test_optimize_table_returns_false_on_exception(): void {
+        $this->pdo
+            ->shouldReceive('query')
+            ->once()
+            ->with('OPTIMIZE TABLE `users`')
+            ->andThrow(new PDOException('Connection lost'));
 
         $result = $this->driver->optimizeTable($this->pdo, 'users');
 
@@ -550,11 +580,15 @@ class MySQLDriverTest extends TestCase {
     // ========== Tests de analyzeTable() ==========
 
     public function test_analyze_table_executes_analyze_command(): void {
+        $stmt = $this->statusRowsStatement([
+            ['Table' => 'db.products', 'Op' => 'analyze', 'Msg_type' => 'status', 'Msg_text' => 'OK'],
+        ]);
+
         $this->pdo
-            ->shouldReceive('exec')
+            ->shouldReceive('query')
             ->once()
             ->with('ANALYZE TABLE `products`')
-            ->andReturn(1);
+            ->andReturn($stmt);
 
         $result = $this->driver->analyzeTable($this->pdo, 'products');
 
@@ -562,26 +596,63 @@ class MySQLDriverTest extends TestCase {
     }
 
     public function test_analyze_table_quotes_table_name(): void {
+        $stmt = $this->statusRowsStatement([
+            ['Msg_type' => 'status', 'Msg_text' => 'OK'],
+        ]);
+
         $this->pdo
-            ->shouldReceive('exec')
+            ->shouldReceive('query')
             ->once()
             ->with('ANALYZE TABLE `table``name`')
-            ->andReturn(1);
+            ->andReturn($stmt);
 
         $result = $this->driver->analyzeTable($this->pdo, 'table`name');
 
         $this->assertTrue($result);
     }
 
-    public function test_analyze_table_returns_false_on_exception(): void {
+    public function test_analyze_table_returns_false_when_status_row_reports_error(): void {
+        $stmt = $this->statusRowsStatement([
+            ['Msg_type' => 'Error', 'Msg_text' => "Table 'db.products' doesn't exist"],
+            ['Msg_type' => 'status', 'Msg_text' => 'Operation failed'],
+        ]);
+
         $this->pdo
-            ->shouldReceive('exec')
+            ->shouldReceive('query')
             ->once()
             ->with('ANALYZE TABLE `products`')
-            ->andThrow(new PDOException('Table does not exist'));
+            ->andReturn($stmt);
 
         $result = $this->driver->analyzeTable($this->pdo, 'products');
 
         $this->assertFalse($result);
+    }
+
+    public function test_analyze_table_returns_false_on_exception(): void {
+        $this->pdo
+            ->shouldReceive('query')
+            ->once()
+            ->with('ANALYZE TABLE `products`')
+            ->andThrow(new PDOException('Connection lost'));
+
+        $result = $this->driver->analyzeTable($this->pdo, 'products');
+
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Crea un PDOStatement mock que devuelve las filas de estado dadas al hacer fetchAll,
+     * imitando lo que MySQL retorna para OPTIMIZE/ANALYZE TABLE.
+     *
+     * @param array $rows Filas de estado a devolver
+     */
+    private function statusRowsStatement(array $rows): PDOStatement {
+        $stmt = Mockery::mock(PDOStatement::class);
+        $stmt->shouldReceive('fetchAll')
+            ->once()
+            ->with(PDO::FETCH_ASSOC)
+            ->andReturn($rows);
+
+        return $stmt;
     }
 }

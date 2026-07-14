@@ -160,7 +160,8 @@ class MySQLDriverIntegrationTest extends TestCase {
             $this->markTestSkipped('MySQL not available');
         }
 
-        // Crear tabla
+        // Crear tabla (IF NOT EXISTS para tolerar estado residual de una corrida abortada)
+        $this->pdo->exec('DROP TABLE IF EXISTS test_optimize');
         $this->pdo->exec("
             CREATE TABLE test_optimize (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -184,7 +185,8 @@ class MySQLDriverIntegrationTest extends TestCase {
             $this->markTestSkipped('MySQL not available');
         }
 
-        // Crear tabla
+        // Crear tabla (IF NOT EXISTS para tolerar estado residual de una corrida abortada)
+        $this->pdo->exec('DROP TABLE IF EXISTS test_optimize');
         $this->pdo->exec("
             CREATE TABLE test_optimize (
                 id INT AUTO_INCREMENT PRIMARY KEY,
